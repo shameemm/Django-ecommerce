@@ -3,24 +3,43 @@ from django.contrib import messages
 
 from django.http import JsonResponse, HttpResponse
 from django.contrib.auth.models import User, auth
+from django.contrib.auth.decorators import login_required
 # from .models import Profile
 
 # Create your views here.
+@login_required(login_url='login')
 def home(request):
-    return render(request, 'home.html')
+    if request.user.is_authenticated:
+        user=request.user
+        print('user=',user)
+        return render(request,'home.html',{'user':user})
+    else:
+        return render(request,'home.html')
+
 
 def login(request):
-    if request.method=='POST':
-        username = request.POST['username']
-        password = request.POST['password']
-        print(password)
-        user=auth.authenticate(username=username, password=password)
-        if user is not None:
-            return redirect('home')
+    if 'username' in request.session:
+        print(request.session)
+        return redirect(to='home')
+    
+    if request.method == 'POST':
+        username=request.POST['username']
+        password=request.POST['password']
+        
+        user = auth.authenticate(username=username, password=password)
+            
+        if user is not None and user.is_superuser==False:
+            auth.login(request, user)
+            request.session['username'] = username
+            return redirect(to='home')
         else:
-            return redirect('login')
-    else:   
+            # messages.info(request, 'Invalid credentials')
+            return redirect(to='login')
+        
+            
+    else:
         return render(request, 'login.html')
+    
 
 def signup(request):
     if request.method=='POST':
@@ -40,9 +59,12 @@ def signup(request):
         else:
             print(password)
             user = User.objects.create_user(username=username, password=password, first_name=first_name, last_name=last_name, email=email,phone=phone )
-            # user=Profile.objects.create_user(username=username, password=password, first_name=first_name, last_name=last_name, email=email,phone=phone )
             user.save()
             print('success')
             return redirect(to='login')
     else:
-        return render(request, 'signup.html')
+        return render(request, 'signup.html')  
+@login_required(login_url='login')
+def logout(request):
+    auth.logout(request)
+    return redirect('login')
